@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+
+require 'daemons'               # daemonize for regular updates
+require 'optparse'              # parse command line arguments
+require 'yaml'                  # load config file
+require_relative 'feedpagelib'  # grunt work, fetch rss feeds and save files
+
+# look for config info
+base_path = File.expand_path('~/.config/feedpage')
+config_yaml = base_path + '/config.yaml'
+
+# set config hash
+if File.exists? config_yaml
+  config = YAML.load_file(config_yaml)
+else
+  config = {} 
+end
+
+# set defaults for unset values
+config['template'] = base_path + '/feedpage.erb'  unless config.has_key? 'template'
+config['html_out'] = base_path + '/feedpage.html' unless config.has_key? 'html_out'
+config['url_list'] = base_path + '/url_list.yaml' unless config.has_key? 'url_list'
+config['log']      = base_path + '/feedpage.log'  unless config.has_key? 'log'
+
+# make sure to have full path for all files
+config.each {|k,v| config[k] = File.expand_path(v) }
+
+# command line args
+options = {}
+OptionParser.new do |parser|
+  parser.on("-d", "--daemon UPDATE_INTERVAL", Integer, 
+            "run as daemon, fetch rss feeds every UPDATE_INTERVAL minutes.") do |v|
+    options['daemonize'] = true
+    options['update_interval'] = v
+  end
+  parser.on("-l", "--log", "Use the log file.") do
+    options['log'] = config['log']
+  end 
+  parser.on("-h", "--help", "Show this help message.") do
+    puts 'Generate a static html page with rss feed entries.'
+    puts parser
+    exit 0
+  end
+end.parse!
+
+# launch as a daemon, or run once
+if options['daemonize']
+  Daemons.daemonize(app_name: "feedpage")
+  interval_in_seconds = options['update_interval']*60
+  loop do
+    new_feedpage(config['url_list'], config['template'], config['html_out'], 
+                 raise_error: false, log: options['log'])
+    sleep(interval_in_seconds)
+  end
+else
+  new_feedpage(config['url_list'], config['template'], config['html_out'], 
+               raise_error: true, log: options['log'])
+end
