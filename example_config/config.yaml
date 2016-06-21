@@ -1,0 +1,4 @@
+template: '~/.config/feedpage/homepage.erb'
+html_out: '~/.config/feedpage/homepage.html'
+url_list: '~/.config/feedpage/url_list.yaml'
+log:      '~/.config/feedpage/feedpage.log'
