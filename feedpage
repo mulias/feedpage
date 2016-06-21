@@ -3,6 +3,7 @@
 require 'daemons'               # daemonize for regular updates
 require 'optparse'              # parse command line arguments
 require 'yaml'                  # load config file
+require 'ostruct'
 require_relative 'feedpagelib'  # grunt work, fetch rss feeds and save files
 
 # look for config info
@@ -43,16 +44,35 @@ OptionParser.new do |parser|
   end
 end.parse!
 
+# a proc that takes an array of feedjira feed objects, and pulls out only the
+# needed data for the relevent feeds. Returns an array of OpenStructs.
+# In this case, return the feed title and most recent update for all feeds
+# updated in the last three days.
+recent_entries_proc = Proc.new do |feeds|
+  three_days_ago = Time.now - (3*24*60*60)
+  feeds.select do |feed|
+    modified = feed.last_modified
+    modified = Time.parse(modified) unless modified.is_a? Time
+    modified > three_days_ago
+  end.map do |feed| 
+    entry = OpenStruct.new
+    entry.feed_title = feed.title.sanitize
+    entry.entry_url = feed.entries.first.url.sanitize
+    entry.entry_title = feed.entries.first.title.sanitize.gsub(/\s+/, ' ')
+    entry
+  end
+end
+
 # launch as a daemon, or run once
 if options['daemonize']
   Daemons.daemonize(app_name: "feedpage")
   interval_in_seconds = options['update_interval']*60
   loop do
     new_feedpage(config['url_list'], config['template'], config['html_out'], 
-                 raise_error: false, log: options['log'])
+                 recent_entries_proc, raise_error: false, log: options['log'])
     sleep(interval_in_seconds)
   end
 else
   new_feedpage(config['url_list'], config['template'], config['html_out'], 
-               raise_error: true, log: options['log'])
+               recent_entries_proc, raise_error: true, log: options['log'])
 end
