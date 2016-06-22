@@ -25,4 +25,5 @@ cp ~/bin/feedpage/example_config/config.yaml feedpage #I cloned feedpage to ~/bi
 
 ## Run
 
-I have feedpage run as a daemon, and update my rss homepage every 45 minutes. I have this line in `.xinitrc`: `feedpage --daemon 45 --log`
+I have feedpage run as a daemon, and update my rss homepage every 45 minutes. I have this line in `.xinitrc`:  
+`feedpage --daemon 45 --log`
