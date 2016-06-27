@@ -4,30 +4,48 @@ require 'erb'
 require 'yaml'
 
 # fetch rss content, build page, and handle errors
-def new_feedpage url_list, template, html_out, feeds_proc, raise_error: true, log: nil
+def new_feedpage url_list, template, html_out, required_fields, feeds_proc, 
+                 raise_error: true, log: nil
   begin
     check_file_exists(template)
     check_file_exists(url_list)
     urls = YAML.load_file(url_list)
-    rss_content = process_feeds(urls, feeds_proc)
+    rss_content = process_feeds(urls, required_fields, feeds_proc, log)
     build_and_save_page(rss_content, template, html_out)
   rescue Exception => e
-    open(log, 'a') { |f| f.puts "#{Time.now}\t#{e.message}" } if log
+    write_log(log, e.message) if log
     raise e if raise_error
   end
 end
 
 private
 
+def write_log log, message
+  open(log, 'a') { |f| f.puts "#{Time.now}\t#{message}" }
+end
+
 # throw exception if file doesn't exist
 def check_file_exists file
   raise "No such file #{file}" unless File.exists? file
 end
 
-# get needed rss content from feed urls
-def process_feeds urls, feeds_proc
-  all_feeds = urls.map { |url| Feedjira::Feed.fetch_and_parse(url) }
-  feeds_proc.call(all_feeds)
+# Get needed rss content from feed urls. Fetch the content with feedjira,
+# filter out all feeds missing information, and apply the user defined
+# feed content proc to collect the needed fields.
+def process_feeds urls, required_fields, feeds_proc, log
+  feeds = urls.map { |url| [url, Feedjira::Feed.fetch_and_parse(url)] }
+  complete_feeds = feeds.select do |url, feed|
+    required_fields.map do |field_name| 
+      call_res = field_name.split('.').inject(feed) do |acc, subfield|
+        acc.respond_to?(subfield) ? acc.send(subfield.to_sym) : nil
+      end
+      write_log(log, "#{url} missing field '#{field_name}'") if log && call_res.nil?
+      call_res
+    end
+    .none? { |field| field.nil? }
+  end
+  .map { |pair| pair[1] } 
+  feeds_proc.call(complete_feeds)
 end
 
 # build html from template, save to file

@@ -44,6 +44,13 @@ OptionParser.new do |parser|
   end
 end.parse!
 
+# each feed must have a non-nil value in each of these fields, otherwise the
+# feed is thrown out
+required_fields = [ 'last_modified', 
+                    'title', 
+                    'entries.first.url',
+                    'entries.first.title' ]
+
 # a proc that takes an array of feedjira feed objects, and pulls out only the
 # needed data for the relevent feeds. Returns an array of OpenStructs.
 # In this case, return the feed title and most recent update for all feeds
@@ -69,10 +76,12 @@ if options['daemonize']
   interval_in_seconds = options['update_interval']*60
   loop do
     new_feedpage(config['url_list'], config['template'], config['html_out'], 
-                 recent_entries_proc, raise_error: false, log: options['log'])
+                 required_fields, recent_entries_proc, 
+                 raise_error: false, log: options['log'])
     sleep(interval_in_seconds)
   end
 else
   new_feedpage(config['url_list'], config['template'], config['html_out'], 
-               recent_entries_proc, raise_error: true, log: options['log'])
+               required_fields, recent_entries_proc, 
+               raise_error: true, log: options['log'])
 end
