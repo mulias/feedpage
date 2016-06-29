@@ -46,22 +46,18 @@ end.parse!
 
 # each feed must have a non-nil value in each of these fields, otherwise the
 # feed is thrown out
-required_fields = [ 'last_modified', 
-                    'title', 
+required_fields = [ 'title', 
+                    'entries.first.published',
                     'entries.first.url',
                     'entries.first.title' ]
 
 # a proc that takes an array of feedjira feed objects, and pulls out only the
 # needed data for the relevent feeds. Returns an array of OpenStructs.
 # In this case, return the feed title and most recent update for all feeds
-# updated in the last three days.
+# updated in the last two days.
 recent_entries_proc = Proc.new do |feeds|
-  three_days_ago = Time.now - (3*24*60*60)
-  feeds.select do |feed|
-    modified = feed.last_modified
-    modified = Time.parse(modified) unless modified.is_a? Time
-    modified > three_days_ago
-  end.map do |feed| 
+  two_days_ago = Time.now - (2*24*60*60)
+  feeds.select { |feed| feed.entries.first.published > two_days_ago }.map do |feed| 
     entry = OpenStruct.new
     entry.feed_title = feed.title.sanitize
     entry.entry_url = feed.entries.first.url.sanitize
@@ -76,12 +72,10 @@ if options['daemonize']
   interval_in_seconds = options['update_interval']*60
   loop do
     new_feedpage(config['url_list'], config['template'], config['html_out'], 
-                 required_fields, recent_entries_proc, 
-                 raise_error: false, log: options['log'])
+                 required_fields, recent_entries_proc, log: options['log'])
     sleep(interval_in_seconds)
   end
 else
   new_feedpage(config['url_list'], config['template'], config['html_out'], 
-               required_fields, recent_entries_proc, 
-               raise_error: true, log: options['log'])
+               required_fields, recent_entries_proc, log: options['log'])
 end
