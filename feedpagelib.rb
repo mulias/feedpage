@@ -4,8 +4,7 @@ require 'erb'
 require 'yaml'
 
 # fetch rss content, build page, and handle errors
-def new_feedpage url_list, template, html_out, required_fields, feeds_proc, 
-                 raise_error: true, log: nil
+def new_feedpage url_list, template, html_out, required_fields, feeds_proc, log: nil
   begin
     check_file_exists(template)
     check_file_exists(url_list)
@@ -13,15 +12,16 @@ def new_feedpage url_list, template, html_out, required_fields, feeds_proc,
     rss_content = process_feeds(urls, required_fields, feeds_proc, log)
     build_and_save_page(rss_content, template, html_out)
   rescue Exception => e
-    write_log(log, e.message) if log
-    raise e if raise_error
+    debug(log, e.message)
+    raise e
   end
 end
 
 private
 
-def write_log log, message
-  open(log, 'a') { |f| f.puts "#{Time.now}\t#{message}" }
+def debug log, message
+  puts message
+  open(log, 'a') { |f| f.puts "#{Time.now}\t#{message}" } if log
 end
 
 # throw exception if file doesn't exist
@@ -39,12 +39,12 @@ def process_feeds urls, required_fields, feeds_proc, log
       call_res = field_name.split('.').inject(feed) do |acc, subfield|
         acc.respond_to?(subfield) ? acc.send(subfield.to_sym) : nil
       end
-      write_log(log, "#{url} missing field '#{field_name}'") if log && call_res.nil?
+      debug(log, "#{url} missing field '#{field_name}'") if call_res.nil?
       call_res
     end
     .none? { |field| field.nil? }
   end
-  .map { |pair| pair[1] } 
+  .map { |_, feed| feed } 
   feeds_proc.call(complete_feeds)
 end
 
