@@ -42,6 +42,9 @@ OptionParser.new do |parser|
     puts parser
     exit 0
   end
+  parser.on("-p", "--progress", "Print update progress to stdout.") do
+    options['print_progress'] = true
+  end
 end.parse!
 
 # each feed must have a non-nil value in each of these fields, otherwise the
@@ -68,14 +71,16 @@ end
 
 # launch as a daemon, or run once
 if options['daemonize']
-  Daemons.daemonize(app_name: "feedpage")
+  Daemons.daemonize(app_name: "feedpage", dir_mode: :normal, dir: base_path)
   interval_in_seconds = options['update_interval']*60
   loop do
     new_feedpage(config['url_list'], config['template'], config['html_out'], 
-                 required_fields, recent_entries_proc, log: options['log'])
+                 required_fields, recent_entries_proc, log: options['log'],
+                 print_progress: options['print_progress'])
     sleep(interval_in_seconds)
   end
 else
   new_feedpage(config['url_list'], config['template'], config['html_out'], 
-               required_fields, recent_entries_proc, log: options['log'])
+               required_fields, recent_entries_proc, log: options['log'],
+               print_progress: options['print_progress'])
 end
